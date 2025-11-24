@@ -1,6 +1,6 @@
-# 🌌 AstraFlow – Node-Based Astro Image Processing Editor
+# 🌌 AstroFlow – Node-Based Astro Image Processing Editor
 
-AstraFlow is a modern, modular image editor built on a node-graph architecture, designed specifically for astrophotography processing.
+AstroFlow is a modern, modular image editor built on a node-graph architecture, designed specifically for astrophotography processing.
 It implements interactive node-flow paradigm known from Unreal Engine.
 
 The application allows you to build complex processing pipelines by intuitively connecting nodes within a 2D workspace.
