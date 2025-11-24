@@ -1,0 +1,4 @@
+qtpynodeeditor
+PyQt5
+# opencv-python
+# numpy
