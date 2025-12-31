@@ -507,38 +507,76 @@ class ImageBrightnesstModel(NodeDataModel):
 
         return QtGui.QPixmap.fromImage(out)
 
-def main(app):
-    registry = qtpynodeeditor.DataModelRegistry()
-    registry.register_model(ImageShowModel, category='My Category')
-    registry.register_model(ImageLoaderModel, category='My Category')
-    registry.register_model(ImageBrightnesstModel, category='My Category')
-    registry.register_model(ImageContrastModel, category='My Category')
-    scene = qtpynodeeditor.FlowScene(registry=registry)
+class MainWindow(QtWidgets.QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("AstroFlow – Node-Based Astro Image Processing Editor")
+        self.resize(1024, 768)
 
-    view = qtpynodeeditor.FlowView(scene)
-    view.setWindowTitle("Image example")
-    view.resize(800, 600)
+        self.registry = qtpynodeeditor.DataModelRegistry()
+        self.registry.register_model(ImageShowModel, category='Nodes')
+        self.registry.register_model(ImageLoaderModel, category='Nodes')
+        self.registry.register_model(ImageBrightnesstModel, category='Nodes')
+        self.registry.register_model(ImageContrastModel, category='Nodes')
 
-    node_loader = scene.create_node(ImageLoaderModel)
-    node_show = scene.create_node(ImageShowModel)
-    node_adjust = scene.create_node(ImageBrightnesstModel)
+        self.scene = qtpynodeeditor.FlowScene(registry=self.registry)
+        self.view = qtpynodeeditor.FlowView(self.scene)
 
-    # wire loader -> adjust -> show
-    scene.create_connection(
+        self.setCentralWidget(self.view)
+        self._create_toolbar()
+
+    def _create_toolbar(self):
+        toolbar = QtWidgets.QToolBar("Main Toolbar")
+        self.addToolBar(toolbar)
+
+        new_action = QtWidgets.QAction("New Project", self)
+        new_action.triggered.connect(self.new_project)
+        toolbar.addAction(new_action)
+
+        load_action = QtWidgets.QAction("Load Project", self)
+        load_action.triggered.connect(self.load_project)
+        toolbar.addAction(load_action)
+
+        save_action = QtWidgets.QAction("Save Project", self)
+        save_action.triggered.connect(self.save_project)
+        toolbar.addAction(save_action)
+
+    def new_project(self):
+        self.scene.clear_scene()
+
+    def save_project(self):
+        fname, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save Project", "", "AstroFlow Project (*.flow)")
+        if fname:
+            self.scene.save(fname)
+
+    def load_project(self):
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Load Project", "", "AstroFlow Project (*.flow)")
+        if fname:
+            self.scene.load(fname)
+
+
+def main():
+    app = QtWidgets.QApplication([])
+    window = MainWindow()
+    window.show()
+
+    # Initial setup
+    node_loader = window.scene.create_node(ImageLoaderModel)
+    node_show = window.scene.create_node(ImageShowModel)
+    node_adjust = window.scene.create_node(ImageBrightnesstModel)
+
+    window.scene.create_connection(
         node_loader[PortType.output][0],
         node_adjust[PortType.input][0],
     )
-    scene.create_connection(
+    window.scene.create_connection(
         node_adjust[PortType.output][0],
         node_show[PortType.input][0],
     )
 
-    return scene, view, [node_loader, node_adjust, node_show]
+    return app.exec_()
 
 
 if __name__ == '__main__':
     logging.basicConfig(level='DEBUG')
-    app = QtWidgets.QApplication([])
-    scene, view, nodes = main(app)
-    view.show()
-    app.exec_()
+    main()
