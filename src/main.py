@@ -1,4 +1,5 @@
 import logging
+import base64
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
@@ -14,6 +15,25 @@ class PixmapData(NodeData):
         self.pixmap = pixmap
 
 
+def pixmap_to_base64(pixmap):
+    if pixmap is None or pixmap.isNull():
+        return None
+    byte_array = QtCore.QByteArray()
+    buffer = QtCore.QBuffer(byte_array)
+    buffer.open(QtCore.QIODevice.WriteOnly)
+    pixmap.save(buffer, "PNG")
+    return base64.b64encode(byte_array.data()).decode('utf-8')
+
+
+def base64_to_pixmap(base64_str):
+    if not base64_str:
+        return QtGui.QPixmap()
+    byte_array = QtCore.QByteArray.fromBase64(base64_str.encode('utf-8'))
+    pixmap = QtGui.QPixmap()
+    pixmap.loadFromData(byte_array, "PNG")
+    return pixmap
+
+
 class ImageLoaderModel(NodeDataModel):
     caption = 'Image Source'
     num_ports = {PortType.input: 0,
@@ -24,6 +44,7 @@ class ImageLoaderModel(NodeDataModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._pixmap = None
+        self._file_name = None
         self._label = QtWidgets.QLabel('Click to load image')
         self._label.setAlignment(Qt.AlignVCenter | Qt.AlignCenter)
 
@@ -49,8 +70,11 @@ class ImageLoaderModel(NodeDataModel):
             file_name, _ = QtWidgets.QFileDialog.getOpenFileName(
                 None, "Open Image", QtCore.QDir.homePath(),
                 "Image files (*.png *.jpg *.bmp)")
+            if not file_name:
+                return False
             try:
                 self._pixmap = QtGui.QPixmap(file_name)
+                self._file_name = file_name
             except Exception as ex:
                 print(f'Failed to load image {file_name}: {ex}')
                 return False
@@ -73,6 +97,21 @@ class ImageLoaderModel(NodeDataModel):
 
     def embedded_widget(self):
         return self._label
+
+    def save(self):
+        return {
+            'file_name': self._file_name,
+            'preview': pixmap_to_base64(self._pixmap)
+        }
+
+    def restore(self, state):
+        self._file_name = state.get('file_name')
+        preview_base64 = state.get('preview')
+        if preview_base64:
+            self._pixmap = base64_to_pixmap(preview_base64)
+            w, h = self._label.width(), self._label.height()
+            self._label.setPixmap(self._pixmap.scaled(w, h, Qt.KeepAspectRatio))
+            self.data_updated.emit(0)
 
 
 class ImageShowModel(NodeDataModel):
@@ -128,6 +167,21 @@ class ImageShowModel(NodeDataModel):
 
     def embedded_widget(self):
         return self._label
+
+    def save(self):
+        pixmap = self._node_data.pixmap if self._node_data else None
+        return {
+            'preview': pixmap_to_base64(pixmap)
+        }
+
+    def restore(self, state):
+        preview_base64 = state.get('preview')
+        if preview_base64:
+            pixmap = base64_to_pixmap(preview_base64)
+            self._node_data = PixmapData(pixmap)
+            w, h = self._label.width(), self._label.height()
+            self._label.setPixmap(pixmap.scaled(w, h, Qt.KeepAspectRatio))
+            self.data_updated.emit(0)
 
 
 class ImageContrastModel(NodeDataModel):
@@ -256,8 +310,22 @@ class ImageContrastModel(NodeDataModel):
         self._debounce_timer.start()
 
     def out_data(self, port):
-        # return adjusted pixmap (if any) as PixmapData
         return PixmapData(self._adjusted_pixmap)
+
+    def save(self):
+        return {
+            'contrast': self.ctr_edit.text(),
+            'preview': pixmap_to_base64(self._adjusted_pixmap)
+        }
+
+    def restore(self, state):
+        self.ctr_edit.setText(state.get('contrast', "1.0"))
+        preview_base64 = state.get('preview')
+        if preview_base64:
+            self._adjusted_pixmap = base64_to_pixmap(preview_base64)
+            w, h = self._preview.width(), self._preview.height()
+            self._preview.setPixmap(self._adjusted_pixmap.scaled(w, h, Qt.KeepAspectRatio))
+            self.data_updated.emit(0)
 
     def _adjust_pixmap(self, pixmap, contrast):
         """
@@ -464,8 +532,22 @@ class ImageBrightnesstModel(NodeDataModel):
         self._debounce_timer.start()
 
     def out_data(self, port):
-        # return adjusted pixmap (if any) as PixmapData
         return PixmapData(self._adjusted_pixmap)
+
+    def save(self):
+        return {
+            'brightness': self.br_edit.text(),
+            'preview': pixmap_to_base64(self._adjusted_pixmap)
+        }
+
+    def restore(self, state):
+        self.br_edit.setText(state.get('brightness', "0"))
+        preview_base64 = state.get('preview')
+        if preview_base64:
+            self._adjusted_pixmap = base64_to_pixmap(preview_base64)
+            w, h = self._preview.width(), self._preview.height()
+            self._preview.setPixmap(self._adjusted_pixmap.scaled(w, h, Qt.KeepAspectRatio))
+            self.data_updated.emit(0)
 
     def _adjust_pixmap(self, pixmap, brightness):
         """
